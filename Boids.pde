@@ -105,34 +105,63 @@ class Boid {
     if (position.x > width+r) position.x = -r;
     if (position.y > height+r) position.y = -r;
   }
-
+  //LJ Potential calc
+  float exp1(float dis){
+    return pow((1/dis),12);
+  }
+  float exp2(float dis){
+    return pow((1/dis),6);
+  }
+  float du(float dis,float eps){
+    return ((-24*eps)/dis)*(2*exp1(dis) - exp2(dis));
+  }
+  float LJ(float dis){
+    float eps = 1;
+    float sigma = 1;
+    float rc = 2.5*sigma;
+    float U_r = du(rc,eps) + du(dis,eps); 
+    return U_r;
+  }
+  //active-active
   PVector separate(ArrayList<Boid> boids) {
-    float desiredseparation = 25.0;
-    //ur = 4eps[(sigma/r)^12 - (sigma/r)^6] 
-    //sigma = particle diameter, eps = interaction strength
-    PVector steer = new PVector(0, 0, 0);
+    float desiredseparation = 2.5;
+    PVector totalForce = new PVector(0,0,0);
+    //int count = 0;
+    for (Boid other : boids) {
+      PVector dir = PVector.sub(this.position, other.position);
+      float d = dir.mag();
+      if ((d > 0) && (d < desiredseparation) && other.size <= 1.0) {
+        float forceMag = LJ(d);
+      
+        dir.normalize();         // Turn into a pure direction vector
+        dir.mult(forceMag);      // Scale it by our exact LJ force value
+        totalForce.add(dir);     // Accumulate the net force    
+        //count++;            
+      }
+    }
+     return totalForce;
+  }
+  //active-solute WCAPOTENTIAL
+   PVector cohesion(ArrayList<Boid> boids) {
+    float neighbordist = 25.0;
+    PVector sum = new PVector(0, 0);   
     int count = 0;
     for (Boid other : boids) {
       float d = PVector.dist(position, other.position);
-      if ((d > 0) && (d < desiredseparation)) {
-        PVector diff = PVector.sub(position, other.position);
-        diff.normalize();
-        diff.div(d);        
-        steer.add(diff);
-        count++;            
+      if ((d > 0) && (d < neighbordist)) {
+        sum.add(other.position); 
+        count++;
       }
     }
     if (count > 0) {
-      steer.div((float)count);
+      sum.div(count);
+      return seek(sum);  
+    } else {
+      return new PVector(0, 0);
     }
-    if (steer.mag() > 0) {
-      steer.normalize();
-      steer.mult(maxspeed);
-      steer.sub(velocity);
-      steer.limit(maxforce);
-    }
-    return steer;
   }
+  
+  //MPCD
   void updateGridData(PVector cm,PVector cellVel) {
     this.cellCM = cm.copy();
     this.cellVel = cellVel.copy();
@@ -208,25 +237,7 @@ class Boid {
   }
   //validate(){
   //}
-  PVector cohesion(ArrayList<Boid> boids) {
-    float neighbordist = 0;
-    PVector sum = new PVector(0, 0);   
-    int count = 0;
-    for (Boid other : boids) {
-      float d = PVector.dist(position, other.position);
-      if ((d > 0) && (d < neighbordist)) {
-        sum.add(other.position); 
-        count++;
-      }
-    }
-    if (count > 0) {
-      sum.div(count);
-      return seek(sum);  
-    } else {
-      return new PVector(0, 0);
-    }
-  }
-  
+ 
 public PVector Momentum(ArrayList<Boid> boids) {
   float neighbordist = mouse_xrad; 
   PVector desiredVelocitySum = new PVector(0, 0);
