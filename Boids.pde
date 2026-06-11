@@ -17,6 +17,8 @@ class Boid {
       return 1;
     }
   }
+  PVector cellCM;
+  PVector cellVel;
 
   Boid(float x, float y) { //constructor
     acceleration = new PVector(0, 0);
@@ -27,6 +29,8 @@ class Boid {
     maxforce = 0.05;
     //col = color(175);//here
     size = bernoulli();
+    cellCM = new PVector(0, 0);
+    cellVel = new PVector(0, 0);
   }
 
   void run(ArrayList<Boid> boids) { 
@@ -35,7 +39,7 @@ class Boid {
     update();
     borders();
     render();
-    MPCD(boids);
+   // MPCD(boids);
     //validate();
   }
 
@@ -48,7 +52,7 @@ class Boid {
     PVector ali = align(boids);      // Alignment
     PVector coh = cohesion(boids);   // Cohesion
     PVector inertia = Momentum(boids); //inertia
-    //void MPCD = MPCD(boids); //solvent to solvent rotation
+    PVector MPCD = MPCD(boids,cellCM,cellVel); //solvent to solvent rotation
 
     sep.mult(1.0);
     ali.mult(1.0);
@@ -57,7 +61,7 @@ class Boid {
     
     //if boids.size[i]==0->active: apply LJ seperation force
     applyForce(sep);
-    //applyForce(MPCD);
+    applyForce(MPCD);
     applyForce(ali);
     applyForce(coh);//convert to wca between all active to solute particles
     applyForce(inertia);
@@ -129,12 +133,18 @@ class Boid {
     }
     return steer;
   }
+  void updateGridData(PVector cm,PVector cellVel) {
+    this.cellCM = cm.copy();
+    this.cellVel = cellVel.copy();
+  }
   //solute to solute interaction
-  void MPCD(ArrayList<Boid> boids){
+  PVector MPCD(ArrayList<Boid> boids,PVector cm, PVector cellVel){
+    this.cellCM = cm.copy();
+    this.cellVel = cellVel.copy();
     //get time
-
+    PVector steer = new PVector(0,0,0);
     //get velocity of particle
-    PVector curr_vel = velocity;
+    PVector del_vel = velocity;
     if(this.size<=1.0){
       //get boids of size == 0
       for(Boid other : boids){
@@ -148,19 +158,22 @@ class Boid {
                          
       boolean yOverlap = this.position.y < other.position.y + 5.0 && 
                          this.position.y + 5.0 > other.position.y;
-        if(xOverlap && yOverlap){
-          pushStyle(); 
-          fill(255, 0, 0);      
-          textSize(20);         
-          textAlign(CENTER, TOP); 
-          text("Collision: " + millis(), width / 2, 40); 
-          popStyle();
+      if(xOverlap && yOverlap){
+          //matrix->
+          PVector rel_vel = PVector.sub(this.velocity, this.cellVel);
+          float[][] Rot_mat = {  {-0.6428,-0.7660}, 
+                                 {0.7660,-0.6428}  };
+          float x = del_vel.x * Rot_mat[0][0]+ del_vel.y*Rot_mat[0][1];
+          float y = del_vel.x * Rot_mat[1][0]+ del_vel.y*Rot_mat[1][1]; 
+          PVector sec = new PVector(x,y);                      
+          PVector first = rel_vel;
+          //apply rotation 
+          steer = PVector.add(first,sec);
         } 
       }
     }
-    //matrix->
-    //apply rotation 
-    //return steer;
+    
+    return steer;
   }
   PVector align(ArrayList<Boid> boids) {
     float neighbordist = mouse_xrad;
